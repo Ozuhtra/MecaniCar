@@ -6,6 +6,104 @@ def fechar_janela():    # Confirma sair do app
     if messagebox.askyesno("Confirmação", "Deseja mesmo sair do MecaniCar?"):
         janela.destroy()
 
+def resistencia_cabo(): # Calcula a resistividade do cabo
+    janela_opcoes = tk.Toplevel(janela)
+    janela_opcoes.title("Calculadora de Resistência do Cabo")
+    janela_opcoes.geometry("400x300") # Aumentei um pouco para caber os botões
+    janela_opcoes.configure(bg="#2c3e50")
+    janela_opcoes.transient(janela)
+
+    tk.Label(janela_opcoes, text="Selecione o material do condutor:", 
+             fg="white", bg="#2c3e50", font=("Arial", 10, "bold")).pack(pady=15)
+
+    def executar_calculo(material, rho):
+        try:
+            comprimento = simpledialog.askfloat("MecaniCar", f"Comprimento do cabo de {material} (em metros):", minvalue=0.01)
+            if comprimento is None: return
+
+            bitola = simpledialog.askfloat("MecaniCar", "Bitola/Área do fio (em mm²):", minvalue=0.1)
+            if bitola is None: return
+
+            resistencia = rho * (comprimento / bitola)
+
+            mensagem_cabo = f"""
+            Relatório Mecanicar
+            ---------------------------------------------------
+            Material: {material}
+            Comprimento: {comprimento:.2f} m
+            Tamanho da bitola: {bitola:.2f} mm²
+            Resistência: {resistencia:.6f} Ω
+            Nota: Valores acima de 0.1 Ω em cabos de 
+            potência podem indicar queda de tensão crítica."""
+            
+            messagebox.showinfo("Diagnóstico", mensagem_cabo)
+            janela_opcoes.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Erro", f"Problema no cálculo: {e}")
+
+    def bitola_ajuda():
+        texto_ajuda = f"""Guia de Bitolas Comuns:
+    --------------------------
+    Bateria/Partida: 25mm² a 50mm²
+    Faróis/Grandes Cargas: 2.5mm² a 4.0mm²
+    Sensores/Sinais: 0.5mm² a 1.0mm²
+        
+    Dica: A bitola costuma estar escrita 
+    no isolamento do cabo!"""
+        
+        messagebox.showinfo("Ajuda com tamanho da bitola", texto_ajuda)
+
+    tk.Button(janela_opcoes, text="COBRE (rho=0.0172)", width=25, bg="#b87333", fg="white",
+              command=lambda: executar_calculo("Cobre", 0.0172)).pack(pady=5)
+    
+    tk.Button(janela_opcoes, text="ALUMÍNIO (rho=0.0282)", width=25, bg="#a5a9b4", fg="black",
+              command=lambda: executar_calculo("Alumínio", 0.0282)).pack(pady=5)
+    
+    tk.Button(janela_opcoes, text="PRATA (rho=0.0159)", width=25, bg="#e5e4e2", fg="black",
+              command=lambda: executar_calculo("Prata", 0.0159)).pack(pady=5)
+    
+    tk.Button(janela_opcoes, text="Guia de tamanho de bitolas", width=40, bg="#00c421", fg="black",
+              command=bitola_ajuda).pack(pady=15)
+
+def conversor_temperatura():    # Conversor °C para °F
+    janela_opcoes = tk.Toplevel(janela)
+    janela_opcoes.title("Conversor de Força")
+    janela_opcoes.geometry("300x200")
+    janela_opcoes.configure(bg="#2c3e50")
+
+    janela_opcoes.transient(janela)
+
+    tk.Label(janela_opcoes, text="Selecione a conversão:",
+             fg="white", bg="#2c3e50", font=("Arial", 10, "bold")).pack(pady=15)
+
+    def executar_calculo(modo):
+        if modo == "C_F":
+            valor = simpledialog.askfloat("MecaniCar", "Digite o valor em °C", minvalue=0.1)
+            if valor is not None:
+                resultado = (valor * 1.8) + 32
+                mensagem_c = f"""
+                Relatório MecaniCar
+                ---------------------------------------------------
+                Resultado: {valor:.2f} °C = {resultado:.2f} °F"""
+
+                messagebox.showinfo("Diagnóstico", mensagem_c)
+        else:
+            valor = simpledialog.askfloat("MecaniCar", "Digite o valor em °F", minvalue=0.1)
+            if valor is not None:
+                resultado = (valor - 32) * 5/9
+                mensagem_f = f"""
+                Relatório MecaniCar
+                ---------------------------------------------------
+                Resultado: {valor} °F = {resultado} °C"""
+                
+                messagebox.showinfo("Diagnóstico", mensagem_f)
+
+    tk.Button(janela_opcoes, text="°C -> °F", width=20, bg="#061824", fg="white",
+              command=lambda: executar_calculo("C_F")).pack(pady=5)
+    tk.Button(janela_opcoes, text="°F -> °C", width=20, bg="#061824", fg="white",
+              command=lambda: executar_calculo("F_C")).pack(pady=5)
+ 
 def conversor_forca():  # Conversor NM para KGFM
     janela_opcoes = tk.Toplevel(janela)
     janela_opcoes.title("Conversor de Força")
@@ -232,6 +330,14 @@ lbl_titulo = tk.Label(janela, text="MECANICAR - A SUA SOLUÇÃO AUTOMOTIVA",  # 
                       font=("Helvetica", 16, "bold"), fg="white", bg="#2c3e50")
 lbl_titulo.place(x=680, y=50, anchor="center")
 
+lbl_leg_conv = tk.Label(janela, text="Conversores de unidades de medida",
+                        font=("Helvetica", 14, "bold"), fg="white", bg="#004ab9")
+lbl_leg_conv.place(x=1000, y=150)
+
+lbl_leg_elet = tk.Label(janela, text="Calculadora eletroeletrônica",
+                        font=("Helvetica", 14, "bold"), fg="white", bg="#004ab9")
+lbl_leg_elet.place(x=20, y=150)
+
 # ----- BOTÕES -----
 btn_iniciar_serie = tk.Button(janela, text="Calcular circuito em série", 
                         command=abrir_janela_serie, 
@@ -258,7 +364,17 @@ btn_calcular_forca = tk.Button(janela, text="Calcular força",
                                width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
 btn_calcular_forca.place(x=1110, y=340)
 
-btn_versao_app = tk.Button(janela, text="v.0.0.2b",
+btn_calcular_temperatura = tk.Button(janela, text="Calcular temperatura",
+                                     command=conversor_temperatura,
+                                     width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
+btn_calcular_temperatura.place(x=1110, y=290)
+
+btn_calcular_cabo = tk.Button(janela, text="Calcular resistividade do cabo", 
+                              command=resistencia_cabo,
+                              width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
+btn_calcular_cabo.place(x=-10, y=345)
+
+btn_versao_app = tk.Button(janela, text="v.0.0.3a",
                            command=abrir_github,
                            fg="red", font=("Arial", 12, "bold"))
 btn_versao_app.place(x=1290, y=680)
