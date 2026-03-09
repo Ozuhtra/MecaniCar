@@ -14,7 +14,7 @@ O MecaniCar é um assistente técnico desenvolvido para otimizar cálculos autom
 Este projeto faz parte do meu cronograma de estudos para a fase nacional da **WorldSkills** na área Tecnologia Automotiva. O foco é garantir precisão técnica e agilidade no diagnóstico eletroeletrônico.
 
 ## 🚀 Como rodar o projeto
-1. *IMPORTANTE*: Para visualização melhor da interface, use-a em tela cheia (apertando o ⬜ no canto superior direito)
+1. *IMPORTANTE*: Para visualização melhor da interface, NÃO use-o em tela cheia(apertando o ⬜ no canto superior direito)
 2. Tenha o Python instalado.
 3. Instale as dependências (se houver).
 4. Execute o arquivo `MecaniCar.py`.
