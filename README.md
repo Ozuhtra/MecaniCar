@@ -3,7 +3,7 @@
 O MecaniCar é um assistente técnico desenvolvido para otimizar cálculos automotivos e consultas técnicas em oficinas de alto desempenho.
 
 ## 🛠️ Funcionalidades Atuais
-- Cálculos Elétricos: Resistência equivalente (Série e Paralelo), Corrente, Potência, Dimensionamento de fusíveis e resistividade do cabo
+- Cálculos Elétricos: Resistência equivalente (Série e Paralelo), Corrente, Potência e resistividade do cabo
 - **Conversores de Medida:**
   - Pressão: Bar <-> PSI.
   - Potência: HP <-> CV.
