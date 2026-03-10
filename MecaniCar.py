@@ -1,11 +1,330 @@
 import tkinter as tk    # Bibliotecas
 from tkinter import messagebox, simpledialog, PhotoImage
 import webbrowser
+import pygame
+import sys
+
+class SimuladorParalelo:    # Faz a animação do circuito paralelo
+    def __init__(self, dados):
+        self.dados = dados
+        self.C_FUNDO = (10, 15, 25)
+        self.C_FIO = (160, 160, 160)
+        self.C_ELETRON = (0, 255, 255)
+        self.C_VALOR = (0, 255, 180)
+        self.C_TEXTO = (220, 220, 220)
+        self.C_TOOLTIP = (30, 35, 50) # Cor do balão de info
+        self.ligado = False
+
+    def desenhar_tooltip(self, tela, fonte, pos, titulo, linhas):
+        """ Desenha o balão de informações (Hover) - IGUAL AO SÉRIE """
+        x, y = pos[0] + 15, pos[1] + 15
+        largura, altura = 220, 30 + (len(linhas) * 20)
+        # Desenha fundo do balão
+        pygame.draw.rect(tela, self.C_TOOLTIP, (x, y, largura, altura), 0, 8)
+        pygame.draw.rect(tela, self.C_FIO, (x, y, largura, altura), 1, 8)
+        # Texto dentro do balão
+        tela.blit(fonte.render(titulo, True, self.C_VALOR), (x + 10, y + 5))
+        for i, linha in enumerate(linhas):
+            tela.blit(fonte.render(linha, True, self.C_TEXTO), (x + 10, y + 28 + (i * 18)))
+
+    def iniciar(self):
+        pygame.init()
+        tela = pygame.display.set_mode((1000, 600))
+        pygame.display.set_caption("MecaniCar - Simulação Paralela")
+        relogio = pygame.time.Clock()
+        
+        fonte_info = pygame.font.SysFont("Arial", 20, bold=True)
+        fonte_res = pygame.font.SysFont("Arial(bold)", 22)
+        fonte_bateria = pygame.font.SysFont("Arial", 16, bold=True)
+        fonte_sinal = pygame.font.SysFont("Arial", 22, bold=True)
+
+        # 15 elétrons distribuídos pelos ramos
+        num_r = len(self.dados['resistores'])
+        eletrons = []
+        for i in range(15):
+            eletrons.append({
+                'ramo': i % num_r, # Distribui entre os caminhos disponíveis
+                'pos_path': i * (1.0 / 15)
+            })
+
+        rodando = True
+        while rodando:
+            m_pos = pygame.mouse.get_pos() # Posição do mouse
+            tela.fill(self.C_FUNDO)
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: rodando = False
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    self.ligado = not self.ligado
+
+            pygame.draw.rect(tela, self.C_FIO, (320, 150, 600, 300), 4)
+            
+            if self.ligado:
+                x_seta = 450 
+                y_seta = 165 # Altura do fio de cima
+
+                txt_seta_simples = fonte_sinal.render("---->", True, (255, 255, 0)) # Amarelo
+                txt_v_seta = fonte_res.render(f"{self.dados['corrente']}A", True, (255, 255, 0))
+
+                tela.blit(txt_seta_simples, (x_seta, y_seta - 12)) 
+                tela.blit(txt_v_seta, (x_seta, y_seta + 10))
+
+            # Símbolo da Bateria (Igual ao Série)
+            pygame.draw.line(tela, self.C_VALOR, (320 - 20, 290), (320 + 20, 290), 3)
+            pygame.draw.line(tela, self.C_VALOR, (320 - 10, 310), (320 + 10, 310), 6)
+
+            txt_tensao = fonte_bateria.render(f"{self.dados['tensao']}V", True, self.C_VALOR)
+            tela.blit(txt_tensao, (185, 290))
+
+            # Polo Positivo (+) e Negativo (-)
+            txt_mais = fonte_sinal.render("+", True, (255, 50, 50))
+            tela.blit(txt_mais, (275, 275)) 
+
+            txt_menos = fonte_sinal.render("-", True, (100, 100, 255))
+            tela.blit(txt_menos, (275, 305)) # Próximo ao polo inferior
+
+            pygame.draw.rect(tela, (20, 30, 50), (20, 20, 260, 150), 0, 10)
+            pygame.draw.rect(tela, self.C_VALOR, (20, 20, 260, 150), 2, 10)
+
+            # Resultados dentro da borda verde
+            potencia_total = self.dados['tensao'] * self.dados['corrente']
+            tela.blit(fonte_info.render("Resultados:", True, self.C_VALOR), (40, 35))
+            tela.blit(fonte_res.render(f"Tensão: {self.dados['tensao']} V", True, self.C_TEXTO), (40, 65))
+            tela.blit(fonte_res.render(f"Corrente Total: {self.dados['corrente']:.2f} A", True, self.C_TEXTO), (40, 85))
+            tela.blit(fonte_res.render(f"Resistência Total: {self.dados['req']:.2f} Ω", True, self.C_TEXTO), (40, 105))
+            tela.blit(fonte_res.render(f"Potência Total: {potencia_total:.2f} W", True, self.C_VALOR), (40, 130))
+
+            # Colisão do mouse
+            resistor_hover = None
+            espacamento = 600 / (num_r + 1)
+            
+            for i, r in enumerate(self.dados['resistores']):
+                px = 320 + espacamento * (i + 1)
+                py = 285 # Centralizado na altura do circuito
+                
+                # Fio vertical do ramo
+                pygame.draw.line(tela, self.C_FIO, (px, 150), (px, 450), 2)
+                
+                # Retângulo do Resistor (Retângulo de colisão igual ao série)
+                r_rect = pygame.Rect(px - 25, py, 50, 30)
+                
+                cor_borda = (255, 255, 255) if r_rect.collidepoint(m_pos) else self.C_FIO
+                pygame.draw.rect(tela, (40, 45, 60), r_rect)
+                pygame.draw.rect(tela, cor_borda, r_rect, 2)
+                
+                # Lógica de Hover (Tooltip)
+                if r_rect.collidepoint(m_pos):
+                    corrente_r = self.dados['tensao'] / r
+                    pot_r = self.dados['tensao'] * corrente_r
+                    resistor_hover = (f"RESISTOR R{i+1}", [
+                        f"Corrente: {corrente_r:.2f} A", 
+                        f"Potência: {pot_r:.2f} W", 
+                        f"Valor: {r} Ω"
+                    ])
+                # Texto R1, R2, etc. (Usando fonte_res e alinhamento do Série)
+                tela.blit(fonte_res.render(f"R{i+1}", True, self.C_TEXTO), (px - 10, py + 35))
+
+            # 4. Elétrons (Velocidade constante e tamanho do Série)
+            if self.ligado:
+                vel = 0.005 # Velocidade fixa e suave, conforme padrão visual
+                for e in eletrons:
+                    e['pos_path'] = (e['pos_path'] + vel) % 1.0
+                    p = e['pos_path']
+                    x_r = 320 + espacamento * (e['ramo'] + 1)
+                    
+                    if p < 0.25: # Superior
+                        x, y = 320 + (x_r - 320) * (p/0.25), 150
+                    elif p < 0.50: # Descendo Ramo
+                        x, y = x_r, 150 + (300 * ((p-0.25)/0.25))
+                    elif p < 0.75: # Inferior
+                        x, y = x_r - (x_r - 320) * ((p-0.50)/0.25), 450
+                    else: # Subindo Bateria
+                        x, y = 320, 450 - (300 * ((p-0.75)/0.25))
+                    
+                    # Desenha elétron (Raio 4, igual ao série)
+                    pygame.draw.circle(tela, self.C_ELETRON, (int(x), int(y)), 4)
+
+            # 5. Desenha o balão de Hover por último (para ficar na frente de tudo)
+            if resistor_hover:
+                self.desenhar_tooltip(tela, fonte_res, m_pos, resistor_hover[0], resistor_hover[1])
+
+            pygame.display.flip()
+            relogio.tick(60)
+        pygame.display.quit()
+
+class SimuladorGrafico: # Faz a animação do circuito série
+    def __init__(self, dados):
+        self.dados = dados
+        self.C_FUNDO = (10, 15, 25)
+        self.C_FIO = (160, 160, 160)
+        self.C_ELETRON = (0, 255, 255)
+        self.C_VALOR = (0, 255, 180)
+        self.C_TEXTO = (220, 220, 220)
+        self.C_TOOLTIP = (30, 35, 50) # Cor do balão de info
+        self.ligado = False
+
+    def desenhar_tooltip(self, tela, fonte, pos, titulo, linhas):
+        """ Desenha o balão de informações (Hover) """
+        x, y = pos[0] + 15, pos[1] + 15
+        largura, altura = 220, 30 + (len(linhas) * 20)
+        # Desenha fundo do balão
+        pygame.draw.rect(tela, self.C_TOOLTIP, (x, y, largura, altura), 0, 8)
+        pygame.draw.rect(tela, self.C_FIO, (x, y, largura, altura), 1, 8)
+        # Texto dentro do balão
+        tela.blit(fonte.render(titulo, True, self.C_VALOR), (x + 10, y + 5))
+        for i, linha in enumerate(linhas):
+            tela.blit(fonte.render(linha, True, self.C_TEXTO), (x + 10, y + 28 + (i * 18)))
+
+    def iniciar(self):
+        pygame.init()
+        tela = pygame.display.set_mode((1000, 600))
+        pygame.display.set_caption("MecaniCar")
+        relogio = pygame.time.Clock()
+        fonte_info = pygame.font.SysFont("Arial", 20, bold=True)
+        fonte_res = pygame.font.SysFont("Arial(bold)", 22)
+        
+        eletrons = [{'pos_path': i * (1.0 / 15)} for i in range(15)]
+        rodando = True
+        
+        while rodando:
+            m_pos = pygame.mouse.get_pos() # Posição do mouse
+            tela.fill(self.C_FUNDO)
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: rodando = False
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    self.ligado = not self.ligado
+
+            # 1. Circuito e Bateria
+            pygame.draw.rect(tela, self.C_FIO, (320, 150, 600, 300), 4)
+            # --- INDICAÇÃO DE FLUXO (SETA SIMPLES) ---
+            if self.ligado:
+                # Definimos a posição no fio superior
+                x_seta = 450 
+                y_seta = 165 # Altura do fio de cima
+
+                # 1. Renderiza a seta -->
+                # Usei a fonte_sinal para a seta ficar maior e visível
+                txt_seta_simples = fonte_sinal.render("---->", True, (255, 255, 0)) # Amarelo
+                
+                # 2. Renderiza a tensão (ex: 12V)
+                txt_v_seta = fonte_res.render(f"{self.dados['corrente']}A", True, (255, 255, 0))
+
+                # 3. 'Cola' na tela (Blit)
+                # Centraliza a seta no fio (ajuste o -5 ou -10 se precisar subir/descer a seta)
+                tela.blit(txt_seta_simples, (x_seta, y_seta - 12)) 
+                
+                # Coloca a tensão logo abaixo da seta
+                tela.blit(txt_v_seta, (x_seta, y_seta + 10))
+            # Símbolo da Bateria
+            pygame.draw.line(tela, self.C_VALOR, (320 - 20, 290), (320 + 20, 290), 3)
+            pygame.draw.line(tela, self.C_VALOR, (320 - 10, 310), (320 + 10, 310), 6)
+
+            fonte_bateria = pygame.font.SysFont("Arial", 16, bold=True)
+            fonte_sinal = pygame.font.SysFont("Arial", 22, bold=True)
+
+            txt_tensao = fonte_bateria.render(f"{self.dados['tensao']}V", True, self.C_VALOR)
+            # Coloca o texto um pouco à esquerda (x=180) e centralizado na altura da bateria (y=290)
+            tela.blit(txt_tensao, (185, 290))
+            # 2. Painel Principal (Com Potência Total)
+            pygame.draw.rect(tela, (20, 30, 50), (20, 20, 260, 150), 0, 10)
+            pygame.draw.rect(tela, self.C_VALOR, (20, 20, 260, 150), 2, 10)
+
+            txt_mais = fonte_sinal.render("+", True, (255, 50, 50))
+            tela.blit(txt_mais, (275, 275)) 
+
+            # 3. Sinal de Negativo (-) em Azul
+            txt_menos = fonte_sinal.render("-", True, (100, 100, 255))
+            tela.blit(txt_menos, (275, 305)) # Próximo ao polo inferior
+            
+            potencia_total = self.dados['tensao'] * self.dados['corrente']
+            
+            tela.blit(fonte_info.render("Resultados:", True, self.C_VALOR), (40, 35))
+            tela.blit(fonte_res.render(f"Tensão: {self.dados['tensao']} V", True, self.C_TEXTO), (40, 65))
+            tela.blit(fonte_res.render(f"Corrente Total: {self.dados['corrente']:.2f} A", True, self.C_TEXTO), (40, 85))
+            tela.blit(fonte_res.render(f"Resistência Total: {self.dados['req']:.2f} Ω", True, self.C_TEXTO), (40, 105))
+            tela.blit(fonte_res.render(f"Potência Total: {potencia_total:.2f} W", True, self.C_VALOR), (40, 130))
+
+            # 3. Resistores e Lógica de Hover
+            resistor_hover = None
+            for i, r in enumerate(self.dados['resistores']):
+                px = 320 + (600 / (len(self.dados['resistores']) + 1)) * (i + 1)
+                py = 450
+                r_rect = pygame.Rect(px - 25, py - 15, 50, 30)
+                
+                # Se o mouse estiver em cima, muda a cor da borda
+                cor_borda = (255, 255, 255) if r_rect.collidepoint(m_pos) else self.C_FIO
+                pygame.draw.rect(tela, (40, 45, 60), r_rect)
+                pygame.draw.rect(tela, cor_borda, r_rect, 2)
+                
+                # Guarda qual resistor está com o mouse em cima para mostrar o balão depois
+                if r_rect.collidepoint(m_pos):
+                    # Cálculos para o resistor específico (Circuito Série: I é a mesma)
+                    queda_v = self.dados['corrente'] * r
+                    pot_r = queda_v * self.dados['corrente']
+                    resistor_hover = (f"RESISTOR R{i+1}", [f"Queda: {queda_v:.2f} V", f"Potência: {pot_r:.2f} W", f"Valor: {r} Ω"])
+
+                tela.blit(fonte_res.render(f"R{i+1}", True, self.C_TEXTO), (px - 10, py + 20))
+
+            # 4. Elétrons (Velocidade Ajustada - Mais lenta)
+            if self.ligado:
+                # Diminuí o fator de multiplicação para a animação ficar suave
+                vel = 0.001 + (self.dados['corrente'] * 0.0005) 
+                if vel > 0.015: vel = 0.015 # Limite para não ficar rápido demais
+                
+                for e in eletrons:
+                    e['pos_path'] = (e['pos_path'] + vel) % 1.0
+                    p = e['pos_path']
+                    if p < 0.33: x, y = 320 + (600 * (p/0.33)), 150
+                    elif p < 0.50: x, y = 920, 150 + (300 * ((p-0.33)/0.17))
+                    elif p < 0.83: x, y = 920 - (600 * ((p-0.50)/0.33)), 450
+                    else: x, y = 320, 450 - (300 * ((p-0.83)/0.17))
+                    pygame.draw.circle(tela, self.C_ELETRON, (int(x), int(y)), 4)
+
+            # 5. Desenha o balão de Hover por último (para ficar na frente de tudo)
+            if resistor_hover:
+                self.desenhar_tooltip(tela, fonte_res, m_pos, resistor_hover[0], resistor_hover[1])
+
+            pygame.display.flip()
+            relogio.tick(60)
+        pygame.display.quit()
 
 def fechar_janela():    # Confirma sair do app
     if messagebox.askyesno("Confirmação", "Deseja mesmo sair do MecaniCar?"):
         janela.destroy()
 
+def bateria_repouso():  # Calcula a bateria em repouso
+    tensao_bateria = simpledialog.askfloat("Mecanicar", "Digite aqui a tensão da bateria em repouso (V):", minvalue=0.1, maxvalue=13.0)
+
+    if tensao_bateria is None:
+        return
+
+    carga_bateria = "Carga Crítica"
+    msg_tipo = messagebox.showwarning
+
+    if tensao_bateria >= 12.6:
+        carga_bateria = "Carga da bateria: 100%"
+        msg_tipo = messagebox.showinfo
+    elif 12.4 <= tensao_bateria < 12.6:
+        carga_bateria = "Carga da bateria: 75%"
+        msg_tipo = messagebox.showinfo
+    elif 12.2 <= tensao_bateria < 12.4:
+        carga_bateria = "Carga da bateria: 50%"
+        msg_tipo = messagebox.showinfo
+    elif 12.0 <= tensao_bateria < 12.2:
+        carga_bateria = "Carga da bateria: 25%"
+        msg_tipo = messagebox.showwarning
+    elif tensao_bateria < 12.0:
+        carga_bateria = "Carga da bateria: abaixo de 20%"
+        msg_tipo = messagebox.showwarning
+
+    msg_tipo("Diagnóstico MecaniCar", f"""
+        Resultados do Teste:
+        -------------------------------------------
+        Tensão da bateria: {tensao_bateria:.1f}V
+        {carga_bateria}
+        """)
+    
 def resistencia_cabo(): # Calcula a resistividade do cabo
     janela_opcoes = tk.Toplevel(janela)
     janela_opcoes.title("Calculadora de Resistência do Cabo")
@@ -231,57 +550,58 @@ def conversor_pressao():    # Conversor BAR para PSI
 
               command=lambda: executar_calculo("PSI_BAR")).pack(pady=5)
 
-def calcular_dinamico(entradas, janela_calculo, tensao):    # Calcula circuito série
+def calcular_dinamico(entradas, janela_calculo, tensao):
     try:
         valores = [float(en.get().replace(',', '.')) for en in entradas if en.get()]
         if not valores: return
         
         req = sum(valores)
         corrente = tensao / req
-        fusivel1, fusivel2 = corrente * 1.20, corrente * 1.50
-        potencia = (tensao ** 2) / req
 
-        resultado = (
-            f"Relatório MecaniCar:\n"
-            f"--------------------------\n"
-            f"Resistência Total: {req:.2f} Ω\n"
-            f"Corrente: {corrente:.2f} A\n"
-            f"Fusível Sugerido: {fusivel1:.2f} a {fusivel2:.2f} A\n"
-            f"Potência Total: {potencia:.2f} W\n"
-            f"Tensão do circuito: {tensao} V"
-        )
-        messagebox.showinfo("Diagnóstico", resultado)
-        janela_calculo.destroy() 
-    except ValueError:
-        messagebox.showerror("Erro", "Preencha os campos com números válidos.")
+        dados_para_simular = {
+            "resistores": valores,
+            "tensao": tensao,
+            "corrente": corrente,
+            "req": req
+        }
 
-def calcular_paralelo_logica(entradas, janela_calculo, tensao): # Calcula circuito paralelo
+        janela_calculo.destroy()
+
+        simulador = SimuladorGrafico(dados_para_simular)
+        simulador.iniciar()
+
+    except Exception as e:
+        messagebox.showerror("Erro", "Verifique os valores inseridos.")
+    
+def calcular_paralelo_logica(entradas, janela_calculo, tensao): 
     try:
         valores = [float(en.get().replace(',', '.')) for en in entradas if en.get()]
         if not valores: return
         
         soma_inversos = sum(1/r for r in valores if r > 0)
         req_paralelo = 1 / soma_inversos
-        
         corrente = tensao / req_paralelo
-        fusivel1, fusivel2 = corrente * 1.20, corrente * 1.50
         potencia = (tensao ** 2) / req_paralelo
 
-        resultado = (
-            f"Relatório MecaniCar:\n"
-            f"--------------------------\n"
-            f"Resistência Total: {req_paralelo:.2f} Ω\n"
-            f"Corrente: {corrente:.2f} A\n"
-            f"Fusível Sugerido: {fusivel1:.2f} a {fusivel2:.2f} A\n"
-            f"Potência Total: {potencia:.2f} W\n"
-            f"Tensão do circuito: {tensao} V"
-        )
-        messagebox.showinfo("Diagnóstico", resultado)
-        janela_calculo.destroy() 
+        # Organizamos os dados para a classe SimuladorParalelo
+        dados_para_simular = {
+            "resistores": valores,
+            "tensao": tensao,
+            "corrente": corrente,
+            "req": req_paralelo,
+            "potencia": potencia
+        }
+
+        janela_calculo.destroy() # Fecha a janela de entrada de dados
+
+        # CHAMA A ANIMAÇÃO PARALELA
+        simulador = SimuladorParalelo(dados_para_simular)
+        simulador.iniciar()
+
     except ZeroDivisionError:
         messagebox.showerror("Erro", "Resistência não pode ser zero!")
-    except ValueError:
-        messagebox.showerror("Erro", "Preencha os campos com números válidos.")
+    except Exception as e:
+        messagebox.showerror("Erro", f"Preencha corretamente: {e}")
 
 def abrir_github(): # Abre o Github através do botão
     webbrowser.open("https://github.com/Ozuhtra/MecaniCar")
@@ -330,57 +650,72 @@ lbl_titulo = tk.Label(janela, text="MECANICAR - A SUA SOLUÇÃO AUTOMOTIVA",  # 
                       font=("Helvetica", 16, "bold"), fg="white", bg="#2c3e50")
 lbl_titulo.place(x=680, y=50, anchor="center")
 
-lbl_leg_conv = tk.Label(janela, text="Conversores de unidades de medida",
-                        font=("Helvetica", 14, "bold"), fg="white", bg="#004ab9")
-lbl_leg_conv.place(x=1000, y=150)
-
-lbl_leg_elet = tk.Label(janela, text="Calculadora eletroeletrônica",
-                        font=("Helvetica", 14, "bold"), fg="white", bg="#004ab9")
-lbl_leg_elet.place(x=20, y=150)
-
 # ----- BOTÕES -----
-btn_iniciar_serie = tk.Button(janela, text="Calcular circuito em série", 
+frame_calculadoras = tk.Frame(janela, bg="#061824") # Use a cor do seu fundo ou mantenha transparente
+frame_calculadoras.place(relx=0.09, rely=0.5, anchor="center")
+
+# Frame para os conversores (Lado Direito)
+frame_conversores = tk.Frame(janela, bg="#061824")
+frame_conversores.place(relx=0.92, rely=0.5, anchor="center")
+
+btn_iniciar_serie = tk.Button(frame_calculadoras, text="Calcular circuito em série", 
                         command=abrir_janela_serie, 
-                        width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
-btn_iniciar_serie.place(x=120, y=420, anchor="center")
+                        width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                        relief="flat", borderwidth=0)
+btn_iniciar_serie.pack(pady=8)
 
-btn_iniciar_paralelo = tk.Button(janela, text="Calcular circuito em paralelo", 
+btn_iniciar_paralelo = tk.Button(frame_calculadoras, text="Calcular circuito em paralelo", 
                         command=abrir_janela_paralelo, 
-                        width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
-btn_iniciar_paralelo.place(x=120, y=470, anchor="center")
+                        width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                        relief="flat", borderwidth=0)
+btn_iniciar_paralelo.pack(pady=8)
 
-btn_calcular_pressao = tk.Button(janela, text="Calcular pressão", 
-                                 command=conversor_pressao,
-                                 width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
-btn_calcular_pressao.place(x=1110, y=440)
-
-btn_calcular_potencia = tk.Button(janela, text="Calcular potência",
-                               command=conversor_potencia,
-                               width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
-btn_calcular_potencia.place(x=1110, y=388.5)
-
-btn_calcular_forca = tk.Button(janela, text="Calcular força",
-                               command=conversor_forca,
-                               width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
-btn_calcular_forca.place(x=1110, y=340)
-
-btn_calcular_temperatura = tk.Button(janela, text="Calcular temperatura",
-                                     command=conversor_temperatura,
-                                     width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
-btn_calcular_temperatura.place(x=1110, y=290)
-
-btn_calcular_cabo = tk.Button(janela, text="Calcular resistividade do cabo", 
+btn_calcular_cabo = tk.Button(frame_calculadoras, text="Calcular resistividade do cabo", 
                               command=resistencia_cabo,
-                              width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"))
-btn_calcular_cabo.place(x=-10, y=345)
+                              width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                              relief="flat", borderwidth=0)
+btn_calcular_cabo.pack(pady=8)
 
-btn_versao_app = tk.Button(janela, text="v.0.0.3a",
+btn_calcular_bateria = tk.Button(frame_calculadoras, text="Calcular a carga da bateria",
+                                 command=bateria_repouso,
+                                 width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                                 relief="flat", borderwidth=0)
+btn_calcular_bateria.pack(pady=8)
+
+btn_calcular_temperatura = tk.Button(frame_conversores, text="Calcular temperatura",
+                                     command=conversor_temperatura,
+                                     width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                                     relief="flat", borderwidth=0)
+btn_calcular_temperatura.pack(pady=8)
+
+btn_calcular_forca = tk.Button(frame_conversores, text="Calcular força",
+                               command=conversor_forca,
+                               width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                               relief="flat", borderwidth=0)
+btn_calcular_forca.pack(pady=8)
+
+btn_calcular_potencia = tk.Button(frame_conversores, text="Calcular potência",
+                               command=conversor_potencia,
+                               width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                               relief="flat", borderwidth=0)
+btn_calcular_potencia.pack(pady=8)
+
+btn_calcular_pressao = tk.Button(frame_conversores, text="Calcular pressão", 
+                                 command=conversor_pressao,
+                                 width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                                 relief="flat", borderwidth=0)
+btn_calcular_pressao.pack(pady=8)
+
+btn_versao_app = tk.Button(janela, text="v.0.0.5",
                            command=abrir_github,
-                           fg="red", font=("Arial", 12, "bold"))
-btn_versao_app.place(x=1290, y=680)
+                           fg="red", font=("Arial", 12, "bold"),
+                           relief="flat", borderwidth=0)
+btn_versao_app.place(relx=0.95, rely=0.95, anchor="w")
 
-btn_sair = tk.Button(janela, text="Fechar", command=fechar_janela, fg="red")
-btn_sair.place(x=680, y=650, anchor="center")
+btn_sair = tk.Button(janela, text="Fechar", command=fechar_janela, 
+                     fg="white", bg="#800000", font=("Arial", 10, "bold"),
+                     width=10, relief="flat", borderwidth=0)
+btn_sair.place(relx=0.5, rely=0.92, anchor="center")
 
 def sobre_eu():
     messagebox.showinfo("Pedro Michelin", "Sou o Pedro, amante de carros, eletroeletrônica, programação e futuro Engenheiro Elétrico!.")
