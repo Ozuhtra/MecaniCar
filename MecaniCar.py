@@ -2,7 +2,9 @@ import tkinter as tk    # Bibliotecas
 from tkinter import messagebox, simpledialog, PhotoImage
 import webbrowser
 import pygame
-import sys
+from datetime import datetime
+from fpdf import FPDF
+import os
 
 class SimuladorParalelo:    # Faz a animação do circuito paralelo
     def __init__(self, dados):
@@ -16,7 +18,6 @@ class SimuladorParalelo:    # Faz a animação do circuito paralelo
         self.ligado = False
 
     def desenhar_tooltip(self, tela, fonte, pos, titulo, linhas):
-        """ Desenha o balão de informações (Hover) - IGUAL AO SÉRIE """
         x, y = pos[0] + 15, pos[1] + 15
         largura, altura = 220, 30 + (len(linhas) * 20)
         # Desenha fundo do balão
@@ -62,9 +63,10 @@ class SimuladorParalelo:    # Faz a animação do circuito paralelo
             if self.ligado:
                 x_seta = 450 
                 y_seta = 165 # Altura do fio de cima
-
+                
                 txt_seta_simples = fonte_sinal.render("---->", True, (255, 255, 0)) # Amarelo
-                txt_v_seta = fonte_res.render(f"{self.dados['corrente']}A", True, (255, 255, 0))
+                texto_formatado = f"{float(self.dados['corrente']):.2f}A"
+                txt_v_seta = fonte_res.render(texto_formatado, True, (255, 255, 0))
 
                 tela.blit(txt_seta_simples, (x_seta, y_seta - 12)) 
                 tela.blit(txt_v_seta, (x_seta, y_seta + 10))
@@ -93,7 +95,7 @@ class SimuladorParalelo:    # Faz a animação do circuito paralelo
             tela.blit(fonte_res.render(f"Corrente Total: {self.dados['corrente']:.2f} A", True, self.C_TEXTO), (40, 85))
             tela.blit(fonte_res.render(f"Resistência Total: {self.dados['req']:.2f} Ω", True, self.C_TEXTO), (40, 105))
             tela.blit(fonte_res.render(f"Potência Total: {potencia_total:.2f} W", True, self.C_VALOR), (40, 130))
-
+            tela.blit(fonte_res.render("Aperte 'espaço' para iniciar", True, self.C_TEXTO), (380, 80))
             # Colisão do mouse
             resistor_hover = None
             espacamento = 600 / (num_r + 1)
@@ -208,7 +210,7 @@ class SimuladorGrafico: # Faz a animação do circuito série
                 txt_seta_simples = fonte_sinal.render("---->", True, (255, 255, 0)) # Amarelo
                 
                 # 2. Renderiza a tensão (ex: 12V)
-                txt_v_seta = fonte_res.render(f"{self.dados['corrente']}A", True, (255, 255, 0))
+                txt_v_seta = fonte_res.render(f"{float(self.dados['corrente']):.2f}A", True, (255, 255, 0))
 
                 # 3. 'Cola' na tela (Blit)
                 # Centraliza a seta no fio (ajuste o -5 ou -10 se precisar subir/descer a seta)
@@ -244,6 +246,7 @@ class SimuladorGrafico: # Faz a animação do circuito série
             tela.blit(fonte_res.render(f"Corrente Total: {self.dados['corrente']:.2f} A", True, self.C_TEXTO), (40, 85))
             tela.blit(fonte_res.render(f"Resistência Total: {self.dados['req']:.2f} Ω", True, self.C_TEXTO), (40, 105))
             tela.blit(fonte_res.render(f"Potência Total: {potencia_total:.2f} W", True, self.C_VALOR), (40, 130))
+            tela.blit(fonte_res.render("Aperte 'espaço' para iniciar", True, self.C_TEXTO), (380, 80))
 
             # 3. Resistores e Lógica de Hover
             resistor_hover = None
@@ -293,6 +296,162 @@ def fechar_janela():    # Confirma sair do app
     if messagebox.askyesno("Confirmação", "Deseja mesmo sair do MecaniCar?"):
         janela.destroy()
 
+def triangulo_formulas():   # Calcula Lei de Ohm
+    janela_calc = tk.Toplevel()
+    janela_calc.title("Calculadora de Lei de Ohm")
+    janela_calc.geometry("550x400")
+    janela_calc.configure(bg="#2c3e50")
+    janela_calc.resizable(False, False)
+
+    tk.Label(janela_calc, text="O QUE VOCÊ DESEJA CALCULAR?", font=("Arial", 14, "bold"), 
+             bg="#121212", fg="#00ffb4").pack(pady=20)
+
+    def interagir(tipo):
+        try:
+            if tipo == "U":
+                r = simpledialog.askfloat("MecaniCar", "Informe a Resistência (Ω):")
+                i = simpledialog.askfloat("MecaniCar", "Informe a Corrente (A):")
+                if r is not None and i is not None:
+                    messagebox.showinfo("Resultado", f"Tensão (U) = {r * i:.2f} V")
+            
+            elif tipo == "R":
+                u = simpledialog.askfloat("MecaniCar", "Informe a Tensão (V):")
+                i = simpledialog.askfloat("MecaniCar", "Informe a Corrente (A):")
+                if u is not None and i is not None:
+                    res = u / i if i > 0 else 0
+                    messagebox.showinfo("Resultado", f"Resistência (R) = {res:.2f} Ω")
+
+            elif tipo == "I_URI":
+                u = simpledialog.askfloat("MecaniCar", "Informe a Tensão (V):")
+                r = simpledialog.askfloat("MecaniCar", "Informe a Resistência (Ω):")
+                if u is not None and r is not None:
+                    res = u / r if r > 0 else 0
+                    messagebox.showinfo("Resultado", f"Corrente (I) = {res:.2f} A")
+
+            elif tipo == "P":
+                u = simpledialog.askfloat("MecaniCar", "Informe a Tensão (V):")
+                i = simpledialog.askfloat("MecaniCar", "Informe a Corrente (A):")
+                if u is not None and i is not None:
+                    messagebox.showinfo("Resultado", f"Potência (P) = {u * i:.2f} W")
+
+            elif tipo == "U_PUI":
+                p = simpledialog.askfloat("MecaniCar", "Informe a Potência (W):")
+                i = simpledialog.askfloat("MecaniCar", "Informe a Corrente (A):")
+                if p is not None and i is not None:
+                    res = p / i if i > 0 else 0
+                    messagebox.showinfo("Resultado", f"Tensão (U) = {res:.2f} V")
+
+            elif tipo == "I_PUI":
+                p = simpledialog.askfloat("MecaniCar", "Informe a Potência (W):")
+                u = simpledialog.askfloat("MecaniCar", "Informe a Tensão (V):")
+                if p is not None and u is not None:
+                    res = p / u if u > 0 else 0
+                    messagebox.showinfo("Resultado", f"Corrente (I) = {res:.2f} A")
+
+        except Exception as e:
+            messagebox.showerror("Erro", "Ocorreu um erro no cálculo.")
+
+    estilo_topo = {"font": ("Arial", 16, "bold"), "width": 6, "height": 2, "bd": 0, "cursor": "hand2"}
+    estilo_base = {"font": ("Arial", 16, "bold"), "width": 5, "height": 2, "bd": 0, "cursor": "hand2"}
+
+    tk.Button(janela_calc, text="U", bg="#FFD700", fg="black", **estilo_topo, command=lambda: interagir("U")).place(x=100, y=130)
+    tk.Button(janela_calc, text="R", bg="#FF8C00", fg="white", **estilo_base, command=lambda: interagir("R")).place(x=60, y=200)
+    tk.Button(janela_calc, text="I", bg="#1E90FF", fg="white", **estilo_base, command=lambda: interagir("I_URI")).place(x=145, y=200)
+
+    tk.Button(janela_calc, text="P", bg="#FF4500", fg="white", **estilo_topo, command=lambda: interagir("P")).place(x=360, y=130)
+    tk.Button(janela_calc, text="U", bg="#FFD700", fg="black", **estilo_base, command=lambda: interagir("U_PUI")).place(x=320, y=200)
+    tk.Button(janela_calc, text="I", bg="#1E90FF", fg="white", **estilo_base, command=lambda: interagir("I_PUI")).place(x=405, y=200)
+
+    tk.Label(janela_calc, text="Clique na grandeza que deseja descobrir", bg="#2c3e50", fg="#FFFFFF", font=("Arial", 10)).place(x=160, y=330)
+
+def gerar_orcamento():  # Gera o orçamento em PDF
+    janela.iconify()
+
+    valor_hora = simpledialog.askfloat("Mecanicar", "Digite o seu valor/hora:")
+    if valor_hora is None: return
+    tempo = simpledialog.askfloat("MecaniCar", "Digite o valor do tempo gasto no serviço (horas):")
+    if tempo is None: return
+    custo_peca = simpledialog.askfloat("MecaniCar", "Digite o valor total das peças:")
+    if custo_peca is None: return
+    nome_mecanico = simpledialog.askstring("MecaniCar", "Digite o nome do mecânico responsável:")
+    if nome_mecanico is None: return
+    nome_cliente = simpledialog.askstring("MecaniCar","Digite o nome do cliente:")
+    if nome_cliente is None: return
+    observacoes = simpledialog.askstring("MecaniCar", "Digite as observações (opcional):")
+    if observacoes is None: 
+        janela.deiconify()
+        return
+
+    mao_de_obra = tempo * valor_hora
+    valor_pecas = custo_peca * 1.3
+    taxa_insumos = mao_de_obra * 0.05
+    resultado = mao_de_obra + valor_pecas + taxa_insumos
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=False)
+    pdf.add_page()
+
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(200, 10, "MECANICAR - ORÇAMENTO DE SERVIÇO", ln=True, align='C')
+    pdf.ln(10)
+
+    pdf.set_font("Arial", "B", 11)
+    pdf.cell(100, 10, f"CLIENTE: {nome_cliente.upper()}", ln=0)
+    pdf.cell(100, 10, f"MECÂNICO: {nome_mecanico.upper()}", ln=1)
+    pdf.ln(5)
+
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(140, 10, "Mão de Obra", 1)
+    pdf.cell(50, 10, f"R$ {mao_de_obra:.2f}", 1, 1, 'R')
+    
+    pdf.cell(140, 10, "Peças", 1)
+    pdf.cell(50, 10, f"R$ {valor_pecas:.2f}", 1, 1, 'R')
+    
+    pdf.cell(140, 10, "Insumos e Materiais", 1)
+    pdf.cell(50, 10, f"R$ {taxa_insumos:.2f}", 1, 1, 'R')
+
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(140, 10, "VALOR TOTAL", 1)
+    pdf.cell(50, 10, f"R$ {resultado:.2f}", 1, 1, 'R')
+
+    if observacoes: 
+        pdf.ln(5) 
+        pdf.set_font("Arial", "B", 11)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 8, "OBSERVAÇÕES:", 0, 1) # Título da seção
+        pdf.multi_cell(0, 6, observacoes, 1)
+
+    pdf.set_y(-45)
+
+    
+    pdf.set_font("Arial", "I", 10)
+
+    x_inicial = 20
+    y_atual = pdf.get_y()
+    pdf.line(x_inicial, y_atual, x_inicial + 80, y_atual) 
+
+    pdf.set_xy(x_inicial, y_atual + 2)
+    pdf.cell(80, 10, f"Assinatura do cliente: {nome_cliente.upper()}", 0, 0, 'C')
+
+    x_mecanico = 110
+    pdf.line(x_mecanico, y_atual, x_mecanico + 80, y_atual)
+
+    pdf.set_xy(x_mecanico, y_atual + 2)
+    pdf.cell(80, 10, f"Assinatura do mecânico: {nome_mecanico.upper()}", 0, 0, 'C')
+
+    agora = datetime.now()
+    data_hora = agora.strftime("%d/%m/%Y %H:%M:%S")
+
+    pdf.set_y(-25)
+    pdf.cell(0, 10, f"Documento gerado em: {data_hora} | Feito com o MecaniCar", 0, 0, 'C')
+
+    nome_arquivo = f"Orcamento_{nome_cliente.replace(' ', '_')}.pdf"
+    pdf.output(nome_arquivo)
+    
+    os.startfile(nome_arquivo)
+
+    messagebox.showinfo("Sucesso", f"Orçamento de R${resultado:.2f} gerado para {nome_cliente}!")
+    
 def bateria_repouso():  # Calcula a bateria em repouso
     tensao_bateria = simpledialog.askfloat("Mecanicar", "Digite aqui a tensão da bateria em repouso (V):", minvalue=0.1, maxvalue=13.0)
 
@@ -550,7 +709,7 @@ def conversor_pressao():    # Conversor BAR para PSI
 
               command=lambda: executar_calculo("PSI_BAR")).pack(pady=5)
 
-def calcular_dinamico(entradas, janela_calculo, tensao):
+def calcular_dinamico(entradas, janela_calculo, tensao):    # Calcula circuito série
     try:
         valores = [float(en.get().replace(',', '.')) for en in entradas if en.get()]
         if not valores: return
@@ -573,7 +732,7 @@ def calcular_dinamico(entradas, janela_calculo, tensao):
     except Exception as e:
         messagebox.showerror("Erro", "Verifique os valores inseridos.")
     
-def calcular_paralelo_logica(entradas, janela_calculo, tensao): 
+def calcular_paralelo_logica(entradas, janela_calculo, tensao): # Calcula circuito paralelo
     try:
         valores = [float(en.get().replace(',', '.')) for en in entradas if en.get()]
         if not valores: return
@@ -614,14 +773,26 @@ def abrir_janela_paralelo():    # Abre a janela p/ calcular o série
 
 def configurar_janela(funcao_calculo, tipo):    # Configurações da janela
     try:
+        # Criamos uma janela oculta temporária para segurar o foco
+        janela.withdraw() 
+        
         tensao = simpledialog.askfloat("MecaniCar", "Tensão do sistema (V):", minvalue=0.1)
-        if tensao is None: return
-        num_res = simpledialog.askinteger("MecaniCar", "Quantos resistores tem na associação?", minvalue=1)
-        if num_res is None: return
+        if tensao is None: 
+            janela.deiconify()
+            return
+            
+        num_res = simpledialog.askinteger("MecaniCar", "Quantos resistores?", minvalue=1)
+        if num_res is None: 
+            janela.deiconify()
+            return
 
+        janela.deiconify() # Traz a principal de volta
+        
         nova_janela = tk.Toplevel(janela)
         nova_janela.title(f"Entrada {tipo}")
-                
+        # FORÇA A JANELA PARA A FRENTE
+        nova_janela.attributes('-topmost', True) 
+        
         entradas = []
         for i in range(num_res):
             tk.Label(nova_janela, text=f"Resistor {i+1} (Ω):").pack(pady=2)
@@ -632,6 +803,7 @@ def configurar_janela(funcao_calculo, tipo):    # Configurações da janela
         tk.Button(nova_janela, text="CALCULAR", bg="blue", fg="white", font=("Arial", 15, "bold"),
                   command=lambda: funcao_calculo(entradas, nova_janela, tensao)).pack(pady=10)
     except Exception as e:
+        janela.deiconify()
         messagebox.showerror("Erro", f"Problema: {e}")
 
 janela = tk.Tk()    # Configurações janela principal
@@ -657,6 +829,18 @@ frame_calculadoras.place(relx=0.09, rely=0.5, anchor="center")
 # Frame para os conversores (Lado Direito)
 frame_conversores = tk.Frame(janela, bg="#061824")
 frame_conversores.place(relx=0.92, rely=0.5, anchor="center")
+
+btn_triangulo_formulas = tk.Button(frame_conversores, text="Calcular lei de ohm",
+                                    command=triangulo_formulas,
+                                    width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                                    relief="flat", borderwidth=0)
+btn_triangulo_formulas.pack(pady=8)
+
+btn_gerar_orcamento = tk.Button(frame_calculadoras, text="Gerar orçamento",
+                                command=gerar_orcamento,
+                                width=25, height=2, bg="#061824", fg="white", font=("Arial", 12, "bold"),
+                                relief="flat", borderwidth=0)
+btn_gerar_orcamento.pack(pady=8)
 
 btn_iniciar_serie = tk.Button(frame_calculadoras, text="Calcular circuito em série", 
                         command=abrir_janela_serie, 
@@ -706,7 +890,7 @@ btn_calcular_pressao = tk.Button(frame_conversores, text="Calcular pressão",
                                  relief="flat", borderwidth=0)
 btn_calcular_pressao.pack(pady=8)
 
-btn_versao_app = tk.Button(janela, text="v.0.0.5",
+btn_versao_app = tk.Button(janela, text="v.0.0.5b",
                            command=abrir_github,
                            fg="red", font=("Arial", 12, "bold"),
                            relief="flat", borderwidth=0)
@@ -721,12 +905,12 @@ def sobre_eu():
     messagebox.showinfo("Pedro Michelin", "Sou o Pedro, amante de carros, eletroeletrônica, programação e futuro Engenheiro Elétrico!.")
 
 def sobre_olavo():
-    messagebox.showinfo("Pedro Henrique", "Coloque seu texto aqui!!")
+    messagebox.showinfo("Pedro Henrique", "Sou o Pedro, amante de matemática, programação e futuro Engenheiro Mecânico!")
 
 btn_sobre_eu = tk.Button(janela, text="Sobre o Pedro Michelin", command=sobre_eu, fg="blue")
-btn_sobre_eu.place(x=520, y=670)
+btn_sobre_eu.place(relx=0.43, rely=0.956, anchor="center")
 
 btn_sobre_olavo = tk.Button(janela, text="Sobre o Pedro Henrique", command=sobre_olavo, fg="pink")
-btn_sobre_olavo.place(x=705, y=670)
+btn_sobre_olavo.place(relx=0.57, rely=0.956, anchor="center")
 
 janela.mainloop()
